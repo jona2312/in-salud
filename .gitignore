@@ -1,0 +1,36 @@
+# SEGURIDAD — nunca commitear estos archivos
+.env
+.env.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.p8
+*.p12
+
+# Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Build outputs
+*.apk
+*.ipa
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+
+# Supabase (nunca commitear service role keys)
+supabase/.temp/

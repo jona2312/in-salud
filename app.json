@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "in-salud",
+    "slug": "in-salud",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0EA5E9"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.insalud.app",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "in-salud usa Face ID para proteger tu información médica",
+        "NSCameraUsageDescription": "in-salud usa la cámara para fotografiar documentos médicos",
+        "NSPhotoLibraryUsageDescription": "in-salud accede a fotos para subir estudios médicos"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0EA5E9"
+      },
+      "package": "com.insalud.app",
+      "kotlinVersion": "1.9.25",
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-local-authentication",
+      "expo-secure-store"
+    ],
+    "scheme": "insalud",
+    "extra": {
+      "eas": {
+        "projectId": "pendiente-configurar"
+      }
+    }
+  }
+}
