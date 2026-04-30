@@ -2,6 +2,7 @@
   "expo": {
     "name": "in-salud",
     "slug": "in-salud",
+    "owner": "jona2312s-organization",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
