@@ -34,7 +34,7 @@ const SecureStoreAdapter = {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient<Database, 'salud'>(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: SecureStoreAdapter,
     autoRefreshToken: true,
