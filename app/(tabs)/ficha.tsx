@@ -2,44 +2,37 @@
  * app/(tabs)/ficha.tsx — Ficha clínica de una persona
  * Recibe el parámetro ?id= desde Home
  */
-
+import { useState } from 'react'
 import {
   View, Text, ScrollView, StyleSheet,
-  ActivityIndicator, TouchableOpacity
+  ActivityIndicator, TouchableOpacity, Alert
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { COLORS } from '@/constants/theme'
-import {
-  Person, Allergy, Medication, EmergencyContact,
-  AllergySeverity, MedicationType
-} from '@/types/database'
+import { Person, Allergy, Medication, EmergencyContact } from '@/types/database'
+import { AddAllergyModal } from '@/components/modals/AddAllergyModal'
+import { AddContactModal } from '@/components/modals/AddContactModal'
 
 async function fetchPerson(id: string): Promise<Person | null> {
-  const { data, error } = await supabase
-    .from('persons').select('*').eq('id', id).single()
+  const { data, error } = await supabase.from('persons').select('*').eq('id', id).single()
   if (error) throw new Error(error.message)
   return data
 }
-
 async function fetchAllergies(personId: string): Promise<Allergy[]> {
   const { data, error } = await supabase
-    .from('allergies').select('*').eq('person_id', personId)
-    .order('severity', { ascending: true })
+    .from('allergies').select('*').eq('person_id', personId).order('severity')
   if (error) throw new Error(error.message)
   return data ?? []
 }
-
 async function fetchMedications(personId: string): Promise<Medication[]> {
   const { data, error } = await supabase
-    .from('medications').select('*').eq('person_id', personId)
-    .eq('is_active', true).order('type')
+    .from('medications').select('*').eq('person_id', personId).eq('is_active', true).order('type')
   if (error) throw new Error(error.message)
   return data ?? []
 }
-
-async function fetchEmergencyContacts(personId: string): Promise<EmergencyContact[]> {
+async function fetchContacts(personId: string): Promise<EmergencyContact[]> {
   const { data, error } = await supabase
     .from('emergency_contacts').select('*').eq('person_id', personId)
     .order('is_primary', { ascending: false })
@@ -47,261 +40,175 @@ async function fetchEmergencyContacts(personId: string): Promise<EmergencyContac
   return data ?? []
 }
 
-const SEVERITY_COLOR: Record<AllergySeverity, string> = {
-  leve: COLORS.severityLeve,
-  moderada: COLORS.severityModerada,
-  grave: COLORS.severityGrave,
+const SEVERITY_CONFIG = {
+  grave:    { label: 'GRAVE',    color: COLORS.danger  },
+  moderada: { label: 'MODERADA', color: COLORS.warning },
+  leve:     { label: 'LEVE',     color: COLORS.success },
 }
-
-const MED_TYPE_COLOR: Record<MedicationType, string> = {
-  diario: COLORS.medDaily,
-  suplemento: COLORS.medSupplement,
-  rescate: COLORS.medRescue,
-  prohibido: COLORS.medForbidden,
-}
-
-const MED_TYPE_LABEL: Record<MedicationType, string> = {
-  diario: 'Diario',
-  suplemento: 'Suplemento',
-  rescate: '🆘 Rescate',
-  prohibido: '🚫 Prohibido',
+const MED_TYPE_LABEL: Record<string, string> = {
+  prohibido: '🚫 Prohibido', rescate: '🆘 Rescate',
+  diario: '💊 Diario', suplemento: '🌿 Suplemento',
 }
 
 export default function FichaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const [showAllergyModal, setShowAllergyModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
 
-  const personQuery = useQuery({
-    queryKey: ['person', id],
-    queryFn: () => fetchPerson(id!),
-    enabled: !!id,
-  })
-  const allergiesQuery = useQuery({
-    queryKey: ['allergies', id],
-    queryFn: () => fetchAllergies(id!),
-    enabled: !!id,
-  })
-  const medsQuery = useQuery({
-    queryKey: ['medications', id],
-    queryFn: () => fetchMedications(id!),
-    enabled: !!id,
-  })
-  const contactsQuery = useQuery({
-    queryKey: ['emergency_contacts', id],
-    queryFn: () => fetchEmergencyContacts(id!),
-    enabled: !!id,
-  })
+  const personQuery  = useQuery({ queryKey: ['person', id],      queryFn: () => fetchPerson(id!),       enabled: !!id })
+  const allergyQuery = useQuery({ queryKey: ['allergies', id],   queryFn: () => fetchAllergies(id!),    enabled: !!id })
+  const medsQuery    = useQuery({ queryKey: ['medications', id], queryFn: () => fetchMedications(id!),  enabled: !!id })
+  const contactQuery = useQuery({ queryKey: ['contacts', id],    queryFn: () => fetchContacts(id!),     enabled: !!id })
 
-  if (!id) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>Seleccioná una persona desde Familia</Text>
-        <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Ir a Familia</Text>
+  const person    = personQuery.data
+  const allergies = allergyQuery.data ?? []
+  const meds      = medsQuery.data ?? []
+  const contacts  = contactQuery.data ?? []
+
+  const handleAllergySaved = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['allergies', id] })
+    await queryClient.invalidateQueries({ queryKey: ['critical', id] })
+    setShowAllergyModal(false)
+    Alert.alert('✓ Guardado', 'Alergia agregada correctamente.')
+  }
+  const handleContactSaved = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['contacts', id] })
+    await queryClient.invalidateQueries({ queryKey: ['critical', id] })
+    setShowContactModal(false)
+    Alert.alert('✓ Guardado', 'Contacto agregado correctamente.')
+  }
+
+  if (!id) return <View style={s.center}><Text style={s.hint}>Seleccioná una persona desde Inicio</Text></View>
+  if (personQuery.isLoading) return <ActivityIndicator style={s.center} color={COLORS.primary} />
+
+  const age = person?.birth_date
+    ? Math.floor((Date.now() - new Date(person.birth_date).getTime()) / 31_557_600_000)
+    : null
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView style={s.container} contentContainerStyle={s.content}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <Text style={s.backText}>← Inicio</Text>
         </TouchableOpacity>
-      </View>
-    )
-  }
 
-  if (personQuery.isLoading) {
-    return <View style={styles.centered}><ActivityIndicator size="large" color={COLORS.primary} /></View>
-  }
-
-  const person = personQuery.data
-  if (!person) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>Persona no encontrada</Text>
-      </View>
-    )
-  }
-
-  const getAge = (birthDate: string | null): string => {
-    if (!birthDate) return '—'
-    const years = Math.floor(
-      (Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-    )
-    return `${years} años`
-  }
-
-  const bpText = person.bp_systolic && person.bp_diastolic
-    ? `${person.bp_systolic}/${person.bp_diastolic}`
-    : '—'
-
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header persona */}
-      <View style={styles.personHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarInitial}>{person.full_name.charAt(0).toUpperCase()}</Text>
-        </View>
-        <View style={styles.personInfo}>
-          <Text style={styles.personName}>{person.full_name}</Text>
-          <Text style={styles.personMeta}>
-            {getAge(person.birth_date)}{person.obra_social ? ` · ${person.obra_social}` : ''}
-          </Text>
-        </View>
-      </View>
-
-      {/* Datos críticos */}
-      <View style={styles.criticalRow}>
-        <View style={styles.criticalBadge}>
-          <Text style={styles.criticalLabel}>Sangre</Text>
-          <Text style={styles.criticalValue}>{person.blood_type ?? '—'}</Text>
-        </View>
-        <View style={styles.criticalBadge}>
-          <Text style={styles.criticalLabel}>PA habitual</Text>
-          <Text style={styles.criticalValue}>{bpText}</Text>
-        </View>
-        <View style={styles.criticalBadge}>
-          <Text style={styles.criticalLabel}>Género</Text>
-          <Text style={styles.criticalValue}>{person.gender ?? '—'}</Text>
-        </View>
-      </View>
-
-      {/* Notas urgentes */}
-      {person.notes ? (
-        <View style={styles.urgentBox}>
-          <Text style={styles.urgentLabel}>⚠️ Notas importantes</Text>
-          <Text style={styles.urgentText}>{person.notes}</Text>
-        </View>
-      ) : null}
-
-      {/* Alergias */}
-      <Section title="Alergias">
-        {allergiesQuery.isLoading
-          ? <ActivityIndicator color={COLORS.primary} />
-          : allergiesQuery.data?.length === 0
-          ? <EmptyItem text="Sin alergias registradas" />
-          : allergiesQuery.data?.map((a) => (
-            <View key={a.id} style={styles.listItem}>
-              <View style={[styles.dot, { backgroundColor: SEVERITY_COLOR[a.severity] }]} />
-              <View style={styles.listItemContent}>
-                <Text style={styles.listItemTitle}>{a.name}</Text>
-                <Text style={styles.listItemSub}>
-                  {a.severity}{a.notes ? ` · ${a.notes}` : ''}
-                </Text>
-              </View>
+        {person && (
+          <View style={s.header}>
+            <View style={s.avatar}><Text style={s.avatarText}>{person.full_name[0]}</Text></View>
+            <View style={s.headerInfo}>
+              <Text style={s.name}>{person.full_name}</Text>
+              {age !== null && <Text style={s.sub}>{age} años</Text>}
+              {person.blood_type && <Text style={s.blood}>🩸 {person.blood_type}</Text>}
             </View>
-          ))
-        }
-      </Section>
+          </View>
+        )}
 
-      {/* Medicación activa */}
-      <Section title="Medicación activa">
-        {medsQuery.isLoading
-          ? <ActivityIndicator color={COLORS.primary} />
-          : medsQuery.data?.length === 0
-          ? <EmptyItem text="Sin medicación registrada" />
-          : medsQuery.data?.map((m) => (
-            <View key={m.id} style={styles.listItem}>
-              <View style={[styles.dot, { backgroundColor: MED_TYPE_COLOR[m.type] }]} />
-              <View style={styles.listItemContent}>
-                <Text style={styles.listItemTitle}>
-                  {m.name}{m.dose ? ` · ${m.dose}` : ''}
-                </Text>
-                <Text style={styles.listItemSub}>
-                  {MED_TYPE_LABEL[m.type]}{m.frequency ? ` · ${m.frequency}` : ''}
-                </Text>
-              </View>
-            </View>
-          ))
-        }
-      </Section>
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionTitle}>Alergias</Text>
+            <TouchableOpacity style={s.addBtn} onPress={() => setShowAllergyModal(true)}>
+              <Text style={s.addBtnText}>+ Agregar</Text>
+            </TouchableOpacity>
+          </View>
+          {allergyQuery.isLoading ? <ActivityIndicator color={COLORS.primary} /> :
+           allergies.length === 0
+            ? <Text style={s.empty}>Sin alergias registradas</Text>
+            : allergies.map(a => {
+                const cfg = SEVERITY_CONFIG[a.severity as keyof typeof SEVERITY_CONFIG]
+                return (
+                  <View key={a.id} style={s.row}>
+                    <Text style={s.rowMain}>{a.name}</Text>
+                    <View style={[s.badge, { backgroundColor: cfg?.color ?? COLORS.gray400 }]}>
+                      <Text style={s.badgeText}>{cfg?.label ?? a.severity}</Text>
+                    </View>
+                  </View>
+                )
+              })
+          }
+        </View>
 
-      {/* Contactos de emergencia */}
-      <Section title="Contactos de emergencia">
-        {contactsQuery.isLoading
-          ? <ActivityIndicator color={COLORS.primary} />
-          : contactsQuery.data?.length === 0
-          ? <EmptyItem text="Sin contactos registrados" />
-          : contactsQuery.data?.map((c) => (
-            <View key={c.id} style={styles.listItem}>
-              <View style={styles.listItemContent}>
-                <Text style={styles.listItemTitle}>
-                  {c.name}{c.is_primary ? ' ⭐' : ''}
-                </Text>
-                <Text style={styles.listItemSub}>
-                  {c.type}{c.phone ? ` · ${c.phone}` : ''}
-                  {c.specialty ? ` · ${c.specialty}` : ''}
-                </Text>
-              </View>
-            </View>
-          ))
-        }
-      </Section>
-    </ScrollView>
-  )
-}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Medicación activa</Text>
+          {medsQuery.isLoading ? <ActivityIndicator color={COLORS.primary} /> :
+           meds.length === 0
+            ? <Text style={s.empty}>Sin medicación activa</Text>
+            : meds.map(m => (
+                <View key={m.id} style={s.row}>
+                  <Text style={s.rowMain}>{m.name}{m.dose ? ` — ${m.dose}` : ''}</Text>
+                  <Text style={s.rowSub}>{MED_TYPE_LABEL[m.type] ?? m.type}</Text>
+                </View>
+              ))
+          }
+        </View>
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionContent}>{children}</View>
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionTitle}>Contactos de emergencia</Text>
+            <TouchableOpacity style={s.addBtn} onPress={() => setShowContactModal(true)}>
+              <Text style={s.addBtnText}>+ Agregar</Text>
+            </TouchableOpacity>
+          </View>
+          {contactQuery.isLoading ? <ActivityIndicator color={COLORS.primary} /> :
+           contacts.length === 0
+            ? <Text style={s.empty}>Sin contactos registrados</Text>
+            : contacts.map(c => (
+                <View key={c.id} style={s.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.rowMain}>{c.name}{c.is_primary ? ' ⭐' : ''}</Text>
+                    {c.specialty && <Text style={s.rowSub}>{c.specialty}</Text>}
+                    {c.phone && <Text style={s.rowSub}>📞 {c.phone}</Text>}
+                  </View>
+                </View>
+              ))
+          }
+        </View>
+      </ScrollView>
+
+      {id && (
+        <>
+          <AddAllergyModal
+            visible={showAllergyModal}
+            personId={id}
+            onClose={() => setShowAllergyModal(false)}
+            onSaved={handleAllergySaved}
+          />
+          <AddContactModal
+            visible={showContactModal}
+            personId={id}
+            onClose={() => setShowContactModal(false)}
+            onSaved={handleContactSaved}
+          />
+        </>
+      )}
     </View>
   )
 }
 
-function EmptyItem({ text }: { text: string }) {
-  return <Text style={styles.emptyItem}>{text}</Text>
-}
-
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: 20, paddingBottom: 40 },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  personHeader: {
-    flexDirection: 'row', alignItems: 'center', marginBottom: 20,
-    backgroundColor: COLORS.white, borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
-  },
-  avatar: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: COLORS.primary, justifyContent: 'center',
-    alignItems: 'center', marginRight: 16,
-  },
-  avatarInitial: { fontSize: 24, fontWeight: '700', color: COLORS.white },
-  personInfo: { flex: 1 },
-  personName: { fontSize: 20, fontWeight: '700', color: COLORS.text },
-  personMeta: { fontSize: 14, color: COLORS.gray500, marginTop: 2 },
-  criticalRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  criticalBadge: {
-    flex: 1, backgroundColor: COLORS.white, borderRadius: 12,
-    padding: 12, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  criticalLabel: {
-    fontSize: 11, color: COLORS.gray400, marginBottom: 4,
-    textTransform: 'uppercase', fontWeight: '600',
-  },
-  criticalValue: { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  urgentBox: {
-    backgroundColor: '#FEF3C7', borderRadius: 12,
-    padding: 14, marginBottom: 16,
-    borderLeftWidth: 4, borderLeftColor: COLORS.warning,
-  },
-  urgentLabel: { fontSize: 13, fontWeight: '700', color: COLORS.warning, marginBottom: 4 },
-  urgentText: { fontSize: 14, color: COLORS.text },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 10 },
-  sectionContent: {
-    backgroundColor: COLORS.white, borderRadius: 14, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  listItem: {
-    flexDirection: 'row', alignItems: 'center', padding: 14,
-    borderBottomWidth: 1, borderBottomColor: COLORS.gray100,
-  },
-  dot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
-  listItemContent: { flex: 1 },
-  listItemTitle: { fontSize: 15, fontWeight: '600', color: COLORS.text },
-  listItemSub: { fontSize: 12, color: COLORS.gray500, marginTop: 2 },
-  emptyItem: { fontSize: 14, color: COLORS.gray400, padding: 14, fontStyle: 'italic' },
-  emptyText: { fontSize: 15, color: COLORS.gray500, marginBottom: 16, textAlign: 'center' },
-  backButton: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, backgroundColor: COLORS.primary },
-  backButtonText: { color: COLORS.white, fontWeight: '600' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  hint: { fontSize: 14, color: COLORS.gray400 },
+  backBtn: { marginBottom: 16 },
+  backText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
+  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 14, padding: 16, marginBottom: 20, gap: 14 },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 24, color: COLORS.white, fontWeight: '700' },
+  headerInfo: { flex: 1 },
+  name: { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  sub: { fontSize: 13, color: COLORS.gray500, marginTop: 2 },
+  blood: { fontSize: 13, color: COLORS.danger, marginTop: 2, fontWeight: '600' },
+  section: { backgroundColor: COLORS.white, borderRadius: 14, padding: 16, marginBottom: 16 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
+  addBtn: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
+  addBtnText: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
+  empty: { fontSize: 13, color: COLORS.gray400, textAlign: 'center', paddingVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.gray100 },
+  rowMain: { fontSize: 15, fontWeight: '500', color: COLORS.text, flex: 1 },
+  rowSub: { fontSize: 12, color: COLORS.gray500, marginTop: 2 },
+  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 8 },
+  badgeText: { fontSize: 11, fontWeight: '700', color: COLORS.white },
 })
