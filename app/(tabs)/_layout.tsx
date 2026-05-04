@@ -1,6 +1,19 @@
 /**
- * app/(tabs)/_layout.tsx — Navegación principal con tabs
- * Basado en el mockup: Home, Ficha, Emergencia, Medicamentos, Historial
+ * app/(tabs)/_layout.tsx — Navegación principal
+ *
+ * Estructura de 5 tabs (límite mobile recomendado):
+ *   1. Inicio   — home familiar
+ *   2. Vitales  — signos vitales (nuevo v2)
+ *   3. SOS      — emergencia (central, prominente)
+ *   4. Turnos   — agenda médica (nuevo v2)
+ *   5. IA       — asistente con visión (nuevo v2)
+ *
+ * Pantallas ocultas del tab bar (accesibles por router.push):
+ *   - ficha         → desde tarjeta de persona en Home
+ *   - historial     → desde Ficha
+ *   - medicamentos  → desde Ficha
+ *   - agregar-persona → FAB en Home
+ *   - editar-persona  → botón en tarjeta de persona
  */
 
 import { Tabs } from 'expo-router'
@@ -24,18 +37,19 @@ export default function TabsLayout() {
         headerShadowVisible: false,
       }}
     >
+      {/* ── TABS VISIBLES ── */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Familia',
+          title: 'Inicio',
           tabBarIcon: ({ color }) => <TabIcon emoji="🏠" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="ficha"
+        name="vitales"
         options={{
-          title: 'Ficha',
-          tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} />,
+          title: 'Vitales',
+          tabBarIcon: ({ color }) => <TabIcon emoji="❤️" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -47,26 +61,40 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="medicamentos"
+        name="turnos"
         options={{
-          title: 'Medicación',
-          tabBarIcon: ({ color }) => <TabIcon emoji="💊" color={color} />,
+          title: 'Turnos',
+          tabBarIcon: ({ color }) => <TabIcon emoji="📅" color={color} />,
         }}
+      />
+      <Tabs.Screen
+        name="asistente"
+        options={{
+          title: 'IA',
+          tabBarIcon: ({ color }) => <TabIcon emoji="🤖" color={color} />,
+        }}
+      />
+
+      {/* ── PANTALLAS OCULTAS (href: null = no aparecen en tab bar) ── */}
+      <Tabs.Screen
+        name="ficha"
+        options={{ title: 'Ficha', href: null }}
       />
       <Tabs.Screen
         name="historial"
-        options={{
-          title: 'Historial',
-          tabBarIcon: ({ color }) => <TabIcon emoji="📋" color={color} />,
-        }}
+        options={{ title: 'Historial', href: null }}
       />
-      {/* Pantalla oculta del tab bar — solo accesible por router.push */}
+      <Tabs.Screen
+        name="medicamentos"
+        options={{ title: 'Medicación', href: null }}
+      />
       <Tabs.Screen
         name="agregar-persona"
-        options={{
-          title: 'Agregar persona',
-          href: null,  // No aparece en el tab bar
-        }}
+        options={{ title: 'Agregar persona', href: null }}
+      />
+      <Tabs.Screen
+        name="editar-persona"
+        options={{ title: 'Editar persona', href: null }}
       />
     </Tabs>
   )

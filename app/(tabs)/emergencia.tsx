@@ -4,15 +4,16 @@
  * SEGURIDAD:
  * - Muestra datos críticos sin requerir re-auth (acceso rápido de emergencia)
  * - Solo expone info mínima necesaria: sangre, alergias graves, meds prohibidos/rescate, contactos
+ * - QR embebe los datos directamente (no URL remota) — funciona offline
  * - No permite edición desde esta pantalla
- * - Solo visible para persons con is_emergency_visible = true
  */
 
 import { useState } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  ActivityIndicator, Linking, Alert
+  ActivityIndicator, Linking, Alert, Modal
 } from 'react-native'
+import QRCode from 'react-native-qrcode-svg'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { COLORS } from '@/constants/theme'
@@ -40,8 +41,56 @@ async function fetchCriticalData(personId: string) {
   }
 }
 
+/** Genera texto plano compacto para el QR — legible por cualquier escáner */
+function buildQRText(person: Person, data: Awaited<ReturnType<typeof fetchCriticalData>>): string {
+  const lines: string[] = []
+  lines.push(`🚨 EMERGENCIA MÉDICA`)
+  lines.push(`Paciente: ${person.full_name}`)
+  if (person.birth_date) {
+    const age = new Date().getFullYear() - new Date(person.birth_date).getFullYear()
+    lines.push(`Edad: ${age} años`)
+  }
+  if (person.blood_type) lines.push(`Grupo sanguíneo: ${person.blood_type}`)
+  if (person.bp_systolic && person.bp_diastolic) {
+    lines.push(`Presión habitual: ${person.bp_systolic}/${person.bp_diastolic} mmHg`)
+  }
+  if (person.obra_social) lines.push(`Obra social: ${person.obra_social}${person.obra_social_num ? ` #${person.obra_social_num}` : ''}`)
+  if (person.notes) lines.push(`⚠️ NOTAS: ${person.notes}`)
+  lines.push(``)
+
+  if (data.allergies.length > 0) {
+    lines.push(`🚫 ALERGIAS GRAVES:`)
+    data.allergies.forEach(a => lines.push(`  - ${a.name}${a.notes ? `: ${a.notes}` : ''}`))
+    lines.push(``)
+  }
+
+  const prohibidos = data.medications.filter(m => m.type === 'prohibido')
+  const rescate = data.medications.filter(m => m.type === 'rescate')
+  if (prohibidos.length > 0) {
+    lines.push(`🚫 MEDICAMENTOS PROHIBIDOS:`)
+    prohibidos.forEach(m => lines.push(`  - ${m.name}${m.dose ? ` ${m.dose}` : ''}`))
+    lines.push(``)
+  }
+  if (rescate.length > 0) {
+    lines.push(`🆘 MEDICAMENTOS DE RESCATE:`)
+    rescate.forEach(m => lines.push(`  - ${m.name}${m.dose ? ` ${m.dose}` : ''}`))
+    lines.push(``)
+  }
+
+  if (data.contacts.length > 0) {
+    lines.push(`📞 CONTACTO DE EMERGENCIA:`)
+    data.contacts.forEach(c => {
+      lines.push(`  ${c.name}${c.type ? ` (${c.type})` : ''}`)
+      if (c.phone) lines.push(`  Tel: ${c.phone}`)
+    })
+  }
+
+  return lines.join('\n')
+}
+
 export default function EmergenciaScreen() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
+  const [showQR, setShowQR] = useState(false)
 
   const personsQuery = useQuery({ queryKey: ['persons_sos'], queryFn: fetchAllPersons })
   const criticalQuery = useQuery({
@@ -52,6 +101,10 @@ export default function EmergenciaScreen() {
 
   const persons = personsQuery.data ?? []
   const selectedPerson = persons.find(p => p.id === selectedPersonId)
+  const criticalData = criticalQuery.data
+  const qrText = selectedPerson && criticalData
+    ? buildQRText(selectedPerson, criticalData)
+    : ''
 
   const callNumber = (phone: string) => {
     const url = `tel:${phone.replace(/\s/g, '')}`
@@ -62,127 +115,171 @@ export default function EmergenciaScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header SOS */}
-      <View style={styles.sosHeader}>
-        <Text style={styles.sosTitle}>🚨 SOS</Text>
-        <Text style={styles.sosSubtitle}>Información de emergencia</Text>
-      </View>
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Header SOS */}
+        <View style={styles.sosHeader}>
+          <Text style={styles.sosTitle}>🚨 SOS</Text>
+          <Text style={styles.sosSubtitle}>Información de emergencia</Text>
+        </View>
 
-      {/* Selector de persona */}
-      <Text style={styles.sectionLabel}>¿Para quién?</Text>
-      {personsQuery.isLoading
-        ? <ActivityIndicator color={COLORS.white} />
-        : (
-          <View style={styles.personSelector}>
-            {persons.map(p => (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.personChip, selectedPersonId === p.id && styles.personChipSelected]}
-                onPress={() => setSelectedPersonId(p.id)}
-              >
-                <Text style={[styles.personChipText, selectedPersonId === p.id && styles.personChipTextSelected]}>
-                  {p.full_name.split(' ')[0]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )
-      }
-
-      {selectedPerson && (
-        <>
-          {/* Datos críticos del paciente */}
-          <View style={styles.criticalCard}>
-            <View style={styles.criticalRow}>
-              <CriticalBadge label="Nombre" value={selectedPerson.full_name} />
-              <CriticalBadge label="Sangre" value={selectedPerson.blood_type ?? '—'} highlight />
+        {/* Selector de persona */}
+        <Text style={styles.sectionLabel}>¿Para quién?</Text>
+        {personsQuery.isLoading
+          ? <ActivityIndicator color={COLORS.white} />
+          : (
+            <View style={styles.personSelector}>
+              {persons.map(p => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[styles.personChip, selectedPersonId === p.id && styles.personChipSelected]}
+                  onPress={() => setSelectedPersonId(p.id)}
+                >
+                  <Text style={[styles.personChipText, selectedPersonId === p.id && styles.personChipTextSelected]}>
+                    {p.full_name.split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            {(selectedPerson.bp_systolic && selectedPerson.bp_diastolic) ? (
-              <CriticalBadge
-                label="Presión habitual"
-                value={`${selectedPerson.bp_systolic}/${selectedPerson.bp_diastolic}`}
-              />
-            ) : null}
-            {selectedPerson.notes ? (
-              <View style={styles.urgentBox}>
-                <Text style={styles.urgentLabel}>⚠️ NOTAS URGENTES:</Text>
-                <Text style={styles.urgentText}>{selectedPerson.notes}</Text>
+          )
+        }
+
+        {selectedPerson && (
+          <>
+            {/* Datos críticos del paciente */}
+            <View style={styles.criticalCard}>
+              <View style={styles.criticalRow}>
+                <CriticalBadge label="Nombre" value={selectedPerson.full_name} />
+                <CriticalBadge label="Sangre" value={selectedPerson.blood_type ?? '—'} highlight />
               </View>
-            ) : null}
-          </View>
-
-          {criticalQuery.isLoading ? (
-            <ActivityIndicator color={COLORS.white} style={{ marginTop: 16 }} />
-          ) : (
-            <>
-              {/* Alergias graves */}
-              {(criticalQuery.data?.allergies ?? []).length > 0 && (
-                <View style={styles.dangerCard}>
-                  <Text style={styles.dangerTitle}>🚫 Alergias graves</Text>
-                  {criticalQuery.data!.allergies.map(a => (
-                    <Text key={a.id} style={styles.dangerItem}>
-                      • {a.name}{a.notes ? ` → ${a.notes}` : ''}
-                    </Text>
-                  ))}
+              {(selectedPerson.bp_systolic && selectedPerson.bp_diastolic) ? (
+                <CriticalBadge
+                  label="Presión habitual"
+                  value={`${selectedPerson.bp_systolic}/${selectedPerson.bp_diastolic}`}
+                />
+              ) : null}
+              {selectedPerson.notes ? (
+                <View style={styles.urgentBox}>
+                  <Text style={styles.urgentLabel}>⚠️ NOTAS URGENTES:</Text>
+                  <Text style={styles.urgentText}>{selectedPerson.notes}</Text>
                 </View>
-              )}
+              ) : null}
+            </View>
 
-              {/* Medicamentos prohibidos / rescate */}
-              {(criticalQuery.data?.medications ?? []).length > 0 && (
-                <View style={styles.medCard}>
-                  <Text style={styles.medTitle}>💊 Medicación crítica</Text>
-                  {criticalQuery.data!.medications.map(m => (
-                    <View key={m.id} style={styles.medItem}>
-                      <Text style={[styles.medType, m.type === 'prohibido' ? styles.forbidden : styles.rescue]}>
-                        {m.type === 'prohibido' ? '🚫 PROHIBIDO' : '🆘 RESCATE'}
+            {criticalQuery.isLoading ? (
+              <ActivityIndicator color={COLORS.white} style={{ marginTop: 16 }} />
+            ) : (
+              <>
+                {/* Alergias graves */}
+                {(criticalQuery.data?.allergies ?? []).length > 0 && (
+                  <View style={styles.dangerCard}>
+                    <Text style={styles.dangerTitle}>🚫 Alergias graves</Text>
+                    {criticalQuery.data!.allergies.map(a => (
+                      <Text key={a.id} style={styles.dangerItem}>
+                        • {a.name}{a.notes ? ` → ${a.notes}` : ''}
                       </Text>
-                      <Text style={styles.medName}>
-                        {m.name}{m.dose ? ` · ${m.dose}` : ''}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
+                    ))}
+                  </View>
+                )}
 
-              {/* Contactos de emergencia */}
-              {(criticalQuery.data?.contacts ?? []).length > 0 && (
-                <View style={styles.contactsCard}>
-                  <Text style={styles.contactsTitle}>📞 Contacto principal</Text>
-                  {criticalQuery.data!.contacts.map(c => (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={styles.callButton}
-                      onPress={() => c.phone && callNumber(c.phone)}
-                      disabled={!c.phone}
-                    >
-                      <View>
-                        <Text style={styles.callName}>{c.name}</Text>
-                        <Text style={styles.callRelation}>{c.type}{c.specialty ? ` · ${c.specialty}` : ''}</Text>
+                {/* Medicamentos prohibidos / rescate */}
+                {(criticalQuery.data?.medications ?? []).length > 0 && (
+                  <View style={styles.medCard}>
+                    <Text style={styles.medTitle}>💊 Medicación crítica</Text>
+                    {criticalQuery.data!.medications.map(m => (
+                      <View key={m.id} style={styles.medItem}>
+                        <Text style={[styles.medType, m.type === 'prohibido' ? styles.forbidden : styles.rescue]}>
+                          {m.type === 'prohibido' ? '🚫 PROHIBIDO' : '🆘 RESCATE'}
+                        </Text>
+                        <Text style={styles.medName}>
+                          {m.name}{m.dose ? ` · ${m.dose}` : ''}
+                        </Text>
                       </View>
-                      {c.phone ? (
-                        <View style={styles.callBadge}>
-                          <Text style={styles.callBadgeText}>📞 {c.phone}</Text>
+                    ))}
+                  </View>
+                )}
+
+                {/* Contactos de emergencia */}
+                {(criticalQuery.data?.contacts ?? []).length > 0 && (
+                  <View style={styles.contactsCard}>
+                    <Text style={styles.contactsTitle}>📞 Contacto principal</Text>
+                    {criticalQuery.data!.contacts.map(c => (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={styles.callButton}
+                        onPress={() => c.phone && callNumber(c.phone)}
+                        disabled={!c.phone}
+                      >
+                        <View>
+                          <Text style={styles.callName}>{c.name}</Text>
+                          <Text style={styles.callRelation}>{c.type}{c.specialty ? ` · ${c.specialty}` : ''}</Text>
                         </View>
-                      ) : null}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+                        {c.phone ? (
+                          <View style={styles.callBadge}>
+                            <Text style={styles.callBadgeText}>📞 {c.phone}</Text>
+                          </View>
+                        ) : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
-              {/* Botón 112 */}
-              <TouchableOpacity style={styles.emergencyCallBtn} onPress={() => callNumber('112')}>
-                <Text style={styles.emergencyCallText}>📞 Llamar Emergencias (112)</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </>
-      )}
+                {/* Botón QR */}
+                {criticalData && (
+                  <TouchableOpacity style={styles.qrButton} onPress={() => setShowQR(true)}>
+                    <Text style={styles.qrButtonText}>📱 Ver QR de emergencia</Text>
+                    <Text style={styles.qrButtonSub}>Escanealo sin necesitar la app</Text>
+                  </TouchableOpacity>
+                )}
 
-      {!selectedPersonId && persons.length > 0 && (
-        <Text style={styles.hint}>Seleccioná una persona para ver su info de emergencia</Text>
-      )}
-    </ScrollView>
+                {/* Botón 112 */}
+                <TouchableOpacity style={styles.emergencyCallBtn} onPress={() => callNumber('112')}>
+                  <Text style={styles.emergencyCallText}>📞 Llamar Emergencias (112)</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </>
+        )}
+
+        {!selectedPersonId && persons.length > 0 && (
+          <Text style={styles.hint}>Seleccioná una persona para ver su info de emergencia</Text>
+        )}
+      </ScrollView>
+
+      {/* Modal QR */}
+      <Modal
+        visible={showQR}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowQR(false)}
+      >
+        <View style={styles.qrOverlay}>
+          <View style={styles.qrModal}>
+            <Text style={styles.qrModalTitle}>🚨 QR de emergencia</Text>
+            {selectedPerson && (
+              <Text style={styles.qrModalSub}>{selectedPerson.full_name}</Text>
+            )}
+            <Text style={styles.qrInstruction}>
+              Mostrá este código a socorristas o personal médico.{'\n'}
+              No requiere teléfono ni conexión para escanearlo.
+            </Text>
+            <View style={styles.qrWrapper}>
+              {qrText ? (
+                <QRCode
+                  value={qrText}
+                  size={220}
+                  color={COLORS.text}
+                  backgroundColor="white"
+                />
+              ) : null}
+            </View>
+            <TouchableOpacity style={styles.qrCloseBtn} onPress={() => setShowQR(false)}>
+              <Text style={styles.qrCloseBtnText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
   )
 }
 
@@ -237,7 +334,7 @@ const styles = StyleSheet.create({
   forbidden: { color: COLORS.danger },
   rescue: { color: COLORS.warning },
   medName: { fontSize: 15, fontWeight: '600', color: COLORS.text },
-  contactsCard: { backgroundColor: COLORS.white, borderRadius: 14, padding: 14, marginBottom: 16 },
+  contactsCard: { backgroundColor: COLORS.white, borderRadius: 14, padding: 14, marginBottom: 12 },
   contactsTitle: { fontSize: 14, fontWeight: '800', color: COLORS.text, marginBottom: 10 },
   callButton: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -247,7 +344,39 @@ const styles = StyleSheet.create({
   callRelation: { fontSize: 12, color: COLORS.gray500 },
   callBadge: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   callBadgeText: { fontSize: 13, fontWeight: '700', color: COLORS.white },
+  qrButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 14, padding: 16,
+    alignItems: 'center', marginBottom: 12, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  qrButtonText: { fontSize: 16, fontWeight: '800', color: COLORS.white },
+  qrButtonSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
   emergencyCallBtn: { backgroundColor: COLORS.white, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 4 },
   emergencyCallText: { fontSize: 16, fontWeight: '800', color: COLORS.danger },
   hint: { textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 24 },
+  // QR Modal
+  qrOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end', alignItems: 'center',
+  },
+  qrModal: {
+    backgroundColor: COLORS.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 28, width: '100%', alignItems: 'center', paddingBottom: 48,
+  },
+  qrModalTitle: { fontSize: 22, fontWeight: '900', color: COLORS.danger, marginBottom: 4 },
+  qrModalSub: { fontSize: 16, fontWeight: '600', color: COLORS.text, marginBottom: 12 },
+  qrInstruction: {
+    fontSize: 13, color: COLORS.gray500, textAlign: 'center',
+    marginBottom: 24, lineHeight: 20,
+  },
+  qrWrapper: {
+    padding: 16, backgroundColor: 'white', borderRadius: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1, shadowRadius: 8, elevation: 4, marginBottom: 24,
+  },
+  qrCloseBtn: {
+    backgroundColor: COLORS.gray100, borderRadius: 12,
+    paddingHorizontal: 40, paddingVertical: 14,
+  },
+  qrCloseBtnText: { fontSize: 16, fontWeight: '700', color: COLORS.text },
 })
