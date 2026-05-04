@@ -19,7 +19,6 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { COLORS } from '@/constants/theme'
 import { BloodType, Gender } from '@/types/database'
 
-// Opciones de grupo sanguíneo y sexo (solo las válidas en el schema)
 const BLOOD_TYPES: BloodType[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 const GENDERS: { value: Gender; label: string }[] = [
   { value: 'M', label: 'Masculino' },
@@ -27,11 +26,15 @@ const GENDERS: { value: Gender; label: string }[] = [
   { value: 'otro', label: 'Otro' },
 ]
 
-// Valida formato de fecha AAAA-MM-DD
 function isValidDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
   const d = new Date(s)
   return !isNaN(d.getTime()) && d.getFullYear() >= 1900 && d <= new Date()
+}
+
+function parseBP(val: string): number | null {
+  const n = parseInt(val.trim(), 10)
+  return (!isNaN(n) && n > 0 && n < 300) ? n : null
 }
 
 export default function AgregarPersonaScreen() {
@@ -39,30 +42,36 @@ export default function AgregarPersonaScreen() {
   const queryClient = useQueryClient()
   const { session } = useAuthStore()
 
-  const [fullName, setFullName] = useState('')
-  const [birthDate, setBirthDate] = useState('')
-  const [bloodType, setBloodType] = useState<BloodType | null>(null)
-  const [gender, setGender] = useState<Gender | null>(null)
-  const [obraSocial, setObraSocial] = useState('')
+  const [fullName, setFullName]           = useState('')
+  const [birthDate, setBirthDate]         = useState('')
+  const [bloodType, setBloodType]         = useState<BloodType | null>(null)
+  const [gender, setGender]               = useState<Gender | null>(null)
+  const [obraSocial, setObraSocial]       = useState('')
   const [obraSocialNum, setObraSocialNum] = useState('')
-  const [notes, setNotes] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [bpSystolic, setBpSystolic]       = useState('')
+  const [bpDiastolic, setBpDiastolic]     = useState('')
+  const [notes, setNotes]                 = useState('')
+  const [isSubmitting, setIsSubmitting]   = useState(false)
 
   const handleSave = async () => {
-    // Validar nombre
     const name = fullName.trim()
     if (name.length < 2) {
       Alert.alert('Nombre requerido', 'Ingresá el nombre completo de la persona.')
       return
     }
 
-    // Validar fecha si se ingresó
     if (birthDate.trim() && !isValidDate(birthDate.trim())) {
       Alert.alert('Fecha inválida', 'Usá el formato AAAA-MM-DD (ej: 1990-05-20).')
       return
     }
 
-    // Validar sesión activa
+    const sys = bpSystolic.trim() ? parseBP(bpSystolic) : null
+    const dia = bpDiastolic.trim() ? parseBP(bpDiastolic) : null
+    if ((bpSystolic.trim() && sys === null) || (bpDiastolic.trim() && dia === null)) {
+      Alert.alert('Presión inválida', 'Ingresá valores numéricos válidos (ej: 120 / 80).')
+      return
+    }
+
     if (!session?.user?.id) {
       Alert.alert('Error', 'Tu sesión expiró. Volvé a iniciar sesión.')
       return
@@ -71,25 +80,27 @@ export default function AgregarPersonaScreen() {
     setIsSubmitting(true)
     try {
       const { error } = await supabase.from('persons').insert({
-        owner_id: session.user.id,       // SIEMPRE del token, nunca del input
-        full_name: name,
-        birth_date: birthDate.trim() || null,
-        blood_type: bloodType,
-        gender: gender,
-        obra_social: obraSocial.trim() || null,
+        owner_id:       session.user.id,
+        full_name:      name,
+        birth_date:     birthDate.trim() || null,
+        blood_type:     bloodType,
+        gender:         gender,
+        obra_social:    obraSocial.trim() || null,
         obra_social_num: obraSocialNum.trim() || null,
-        notes: notes.trim() || null,
-        is_emergency_visible: true,      // default seguro
+        bp_systolic:    sys,
+        bp_diastolic:   dia,
+        notes:          notes.trim() || null,
+        is_emergency_visible: true,
       })
 
       if (error) throw new Error(error.message)
 
-      // Invalidar cache para que Home y otras pantallas refresquen
       await queryClient.invalidateQueries({ queryKey: ['persons'] })
       await queryClient.invalidateQueries({ queryKey: ['persons_meds'] })
       await queryClient.invalidateQueries({ queryKey: ['persons_hist'] })
+      await queryClient.invalidateQueries({ queryKey: ['persons_sos'] })
 
-      Alert.alert('¡Listo!', `${name} fue agregado/a.`, [
+      Alert.alert('Listo', `${name} fue agregado/a.`, [
         { text: 'OK', onPress: () => router.back() }
       ])
     } catch (err) {
@@ -109,7 +120,7 @@ export default function AgregarPersonaScreen() {
         <Text style={styles.pageTitle}>Nueva persona</Text>
         <Text style={styles.pageSubtitle}>Completá los datos básicos. Podés agregar más información después.</Text>
 
-        {/* ── Nombre ── */}
+        {/* Nombre */}
         <View style={styles.field}>
           <Text style={styles.label}>Nombre completo <Text style={styles.required}>*</Text></Text>
           <TextInput
@@ -124,7 +135,7 @@ export default function AgregarPersonaScreen() {
           />
         </View>
 
-        {/* ── Fecha de nacimiento ── */}
+        {/* Fecha de nacimiento */}
         <View style={styles.field}>
           <Text style={styles.label}>Fecha de nacimiento</Text>
           <TextInput
@@ -139,7 +150,7 @@ export default function AgregarPersonaScreen() {
           />
         </View>
 
-        {/* ── Grupo sanguíneo ── */}
+        {/* Grupo sanguíneo */}
         <View style={styles.field}>
           <Text style={styles.label}>Grupo sanguíneo</Text>
           <View style={styles.chipRow}>
@@ -149,15 +160,13 @@ export default function AgregarPersonaScreen() {
                 style={[styles.chip, bloodType === bt && styles.chipSelected]}
                 onPress={() => setBloodType(prev => prev === bt ? null : bt)}
               >
-                <Text style={[styles.chipText, bloodType === bt && styles.chipTextSelected]}>
-                  {bt}
-                </Text>
+                <Text style={[styles.chipText, bloodType === bt && styles.chipTextSelected]}>{bt}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* ── Sexo ── */}
+        {/* Sexo */}
         <View style={styles.field}>
           <Text style={styles.label}>Sexo</Text>
           <View style={styles.chipRow}>
@@ -167,15 +176,43 @@ export default function AgregarPersonaScreen() {
                 style={[styles.chip, styles.chipWide, gender === g.value && styles.chipSelected]}
                 onPress={() => setGender(prev => prev === g.value ? null : g.value)}
               >
-                <Text style={[styles.chipText, gender === g.value && styles.chipTextSelected]}>
-                  {g.label}
-                </Text>
+                <Text style={[styles.chipText, gender === g.value && styles.chipTextSelected]}>{g.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* ── Obra Social ── */}
+        {/* Presión arterial habitual */}
+        <View style={styles.field}>
+          <Text style={styles.label}>Presión arterial habitual</Text>
+          <Text style={styles.sublabel}>El valor normal típico es 120/80 mmHg</Text>
+          <View style={styles.bpRow}>
+            <TextInput
+              style={[styles.input, styles.bpInput]}
+              value={bpSystolic}
+              onChangeText={setBpSystolic}
+              placeholder="Sistólica"
+              placeholderTextColor={COLORS.gray400}
+              keyboardType="numeric"
+              returnKeyType="next"
+              maxLength={3}
+            />
+            <Text style={styles.bpSeparator}>/</Text>
+            <TextInput
+              style={[styles.input, styles.bpInput]}
+              value={bpDiastolic}
+              onChangeText={setBpDiastolic}
+              placeholder="Diastólica"
+              placeholderTextColor={COLORS.gray400}
+              keyboardType="numeric"
+              returnKeyType="next"
+              maxLength={3}
+            />
+            <Text style={styles.bpUnit}>mmHg</Text>
+          </View>
+        </View>
+
+        {/* Obra Social */}
         <View style={styles.field}>
           <Text style={styles.label}>Obra social / Prepaga</Text>
           <TextInput
@@ -190,7 +227,7 @@ export default function AgregarPersonaScreen() {
           />
         </View>
 
-        {/* ── Número de afiliado ── */}
+        {/* Número de afiliado */}
         <View style={styles.field}>
           <Text style={styles.label}>Número de afiliado</Text>
           <TextInput
@@ -199,20 +236,19 @@ export default function AgregarPersonaScreen() {
             onChangeText={setObraSocialNum}
             placeholder="Ej: 1234567-890"
             placeholderTextColor={COLORS.gray400}
-            keyboardType="default"
             returnKeyType="next"
             maxLength={50}
           />
         </View>
 
-        {/* ── Notas ── */}
+        {/* Notas urgentes */}
         <View style={styles.field}>
-          <Text style={styles.label}>Notas generales</Text>
+          <Text style={styles.label}>Notas urgentes</Text>
           <TextInput
             style={[styles.input, styles.inputMultiline]}
             value={notes}
             onChangeText={setNotes}
-            placeholder="Observaciones urgentes, condiciones especiales…"
+            placeholder="Observaciones críticas, condiciones especiales…"
             placeholderTextColor={COLORS.gray400}
             multiline
             numberOfLines={3}
@@ -221,7 +257,6 @@ export default function AgregarPersonaScreen() {
           />
         </View>
 
-        {/* ── Botones ── */}
         <TouchableOpacity
           style={[styles.btnSave, isSubmitting && styles.btnDisabled]}
           onPress={handleSave}
@@ -233,11 +268,7 @@ export default function AgregarPersonaScreen() {
           }
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.btnCancel}
-          onPress={() => router.back()}
-          disabled={isSubmitting}
-        >
+        <TouchableOpacity style={styles.btnCancel} onPress={() => router.back()} disabled={isSubmitting}>
           <Text style={styles.btnCancelText}>Cancelar</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -253,6 +284,7 @@ const styles = StyleSheet.create({
 
   field: { marginBottom: 20 },
   label: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 },
+  sublabel: { fontSize: 12, color: COLORS.gray400, marginBottom: 8, marginTop: -4 },
   required: { color: COLORS.danger },
 
   input: {
@@ -267,34 +299,21 @@ const styles = StyleSheet.create({
   },
   inputMultiline: { minHeight: 90, paddingTop: 12 },
 
+  bpRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bpInput: { flex: 1 },
+  bpSeparator: { fontSize: 24, fontWeight: '300', color: COLORS.gray400 },
+  bpUnit: { fontSize: 13, color: COLORS.gray500, fontWeight: '600', marginLeft: 4 },
+
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    borderWidth: 1.5,
-    borderColor: COLORS.gray200,
-  },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.gray200 },
   chipWide: { paddingHorizontal: 18 },
   chipSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   chipText: { fontSize: 14, fontWeight: '600', color: COLORS.text },
   chipTextSelected: { color: COLORS.white },
 
-  btnSave: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
+  btnSave: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 12 },
   btnDisabled: { opacity: 0.6 },
   btnSaveText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
-
-  btnCancel: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
+  btnCancel: { borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   btnCancelText: { color: COLORS.gray500, fontSize: 15, fontWeight: '600' },
 })
