@@ -14,6 +14,7 @@
  *   - medicamentos  → desde Ficha
  *   - agregar-persona → FAB en Home
  *   - editar-persona  → botón en tarjeta de persona
+ *   - documentos      → desde Ficha
  */
 
 import { Tabs } from 'expo-router'
@@ -96,6 +97,10 @@ export default function TabsLayout() {
         name="editar-persona"
         options={{ title: 'Editar persona', href: null }}
       />
+      <Tabs.Screen
+        name="documentos"
+        options={{ title: 'Documentos', href: null }}
+      />
     </Tabs>
   )
 }
@@ -131,10 +136,3 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: COLORS.danger,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-})

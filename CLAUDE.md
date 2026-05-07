@@ -34,6 +34,7 @@ app/
   (tabs)/editar-persona.tsx  — formulario de edición + foto de perfil (v2)
   (tabs)/medicamentos.tsx   — gestión de medicamentos
   (tabs)/historial.tsx      — eventos, antecedentes, vacunas
+  (tabs)/documentos.tsx    — documentos y estudios médicos (PDF + imágenes)
 
 lib/supabase.ts             — cliente Supabase (SecureStore, schema salud)
 stores/useAuthStore.ts      — sesión de usuario
@@ -57,7 +58,7 @@ components/modals/          — modales reutilizables (AddAllergyModal, etc.)
 | `vitals` | Signos vitales con timestamp (v2) |
 | `appointments` | Turnos médicos con estado (v2) |
 | `medication_logs` | Registro de toma de medicamentos (v2, no implementado en UI) |
-| `documents` | Documentos adjuntos (v2, no implementado en UI) |
+| `documents` | Documentos adjuntos — PDF e imágenes, Storage bucket privado |
 
 ### Campos clave de `persons`
 - `owner_id` UUID — siempre tomado de la sesión, nunca del cliente
@@ -86,9 +87,9 @@ supabase.functions.invoke('ai-assistant', {
   body: { message: string, imageUri?: string, history: Message[] }
 })
 ```
-La Edge Function **`ai-assistant` aún no está desplegada**. Necesita:
-1. Crear en `supabase/functions/ai-assistant/index.ts`
-2. Llamar a la API de Anthropic con la API key como secreto de Supabase
+La Edge Function **`ai-assistant` está DESPLEGADA** en el proyecto in-salud. Usa OpenAI GPT-4o. Para actualizar:
+1. Editar `supabase/functions/ai-assistant/index.ts`
+2. Llama a OpenAI GPT-4o (secreto OPENAI_API_KEY ya configurado en Supabase)
 3. Desplegar con `supabase functions deploy ai-assistant`
 
 ## Variables de entorno requeridas
@@ -126,10 +127,7 @@ git config --local --unset core.hooksPath
 - Seguridad: comentarios `SEGURIDAD:` en cada archivo que maneja datos sensibles
 
 ## Lo que falta (v3 backlog)
-- [ ] Edge Function `ai-assistant` (Anthropic API)
-- [ ] Pantalla de documentos (bucket `documents` ya existe en DB)
+- [x] Edge Function `ai-assistant` (OpenAI GPT-4o — DESPLEGADA)
+- [x] Pantalla de documentos (documentos.tsx — PDF + imágenes, Storage buckets avatars y documents CREADOS)
 - [ ] Registro de toma de medicamentos (tabla `medication_logs` lista)
-- [ ] Notificaciones de turnos (expo-notifications)
-- [ ] Exportar ficha como PDF
-- [ ] Modo offline con sincronización
-- [ ] Tests (jest + testing-library/react-native)
+- [ ] Notificaciones de turnos

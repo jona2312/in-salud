@@ -173,6 +173,13 @@ export default function FichaScreen() {
             <Text style={s.quickBtnIcon}>📅</Text>
             <Text style={s.quickBtnLabel}>Turnos</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={s.quickBtn}
+            onPress={() => router.push(`/(tabs)/documentos?id=${id}`)}
+          >
+            <Text style={s.quickBtnIcon}>📁</Text>
+            <Text style={s.quickBtnLabel}>Documentos</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Alergias */}
@@ -290,9 +297,10 @@ const s = StyleSheet.create({
   editBtnText: { fontSize: 20 },
 
   // Accesos rápidos
-  quickActions: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
   quickBtn: {
-    flex: 1, backgroundColor: COLORS.white, borderRadius: 12, padding: 12,
+    width: '18%', minWidth: 60, flexGrow: 1,
+    backgroundColor: COLORS.white, borderRadius: 12, padding: 12,
     alignItems: 'center', borderWidth: 1, borderColor: COLORS.gray200,
   },
   quickBtnIcon: { fontSize: 22, marginBottom: 4 },
@@ -307,10 +315,4 @@ const s = StyleSheet.create({
   empty: { fontSize: 13, color: COLORS.gray400, textAlign: 'center', paddingVertical: 8 },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.gray100,
-  },
-  rowMain: { fontSize: 15, fontWeight: '500', color: COLORS.text, flex: 1 },
-  rowSub: { fontSize: 12, color: COLORS.gray500, marginTop: 2 },
-  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 8 },
-  badgeText: { fontSize: 11, fontWeight: '700', color: COLORS.white },
-})
+    paddingVertical: 8, borderBottomWidth: 1, bord
