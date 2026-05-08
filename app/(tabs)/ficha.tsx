@@ -315,4 +315,10 @@ const s = StyleSheet.create({
   empty: { fontSize: 13, color: COLORS.gray400, textAlign: 'center', paddingVertical: 8 },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 8, borderBottomWidth: 1, bord
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.gray100,
+  },
+  rowMain: { fontSize: 15, fontWeight: '500', color: COLORS.text, flex: 1 },
+  rowSub: { fontSize: 12, color: COLORS.gray500, marginTop: 2 },
+  badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 8 },
+  badgeText: { fontSize: 11, fontWeight: '700', color: COLORS.white },
+})
