@@ -126,11 +126,15 @@ git config --local --unset core.hooksPath
 - Estilos: `StyleSheet.create` inline en cada archivo (no CSS-in-JS externo)
 - Seguridad: comentarios `SEGURIDAD:` en cada archivo que maneja datos sensibles
 
-## Lo que falta (v3 backlog)
-- [x] Edge Function `ai-assistant` (OpenAI GPT-4o — DESPLEGADA)
-- [x] Pantalla de documentos (documentos.tsx — PDF + imágenes, Storage buckets avatars y documents CREADOS)
-- [ ] Registro de toma de medicamentos (tabla `medication_logs` lista)
-- [ ] Notificaciones de turnos (expo-notifications)
-- [ ] Exportar ficha como PDF
-- [ ] Modo offline con sincronización
+## Backlog completado (MVP v1)
+- [x] Edge Function `ai-assistant` (OpenAI GPT-4o - DESPLEGADA)
+- [x] Pantalla de documentos (PDF + imagenes, Storage buckets creados)
+- [x] Registro de toma de medicamentos (medication_logs con logs diarios)
+- [x] Notificaciones de turnos (expo-notifications, recordatorio 1 dia antes)
+- [x] Exportar ficha como PDF (expo-print + expo-sharing, HTML completo)
+
+## Proximos pasos (v2)
+- [ ] Modo offline con sincronizacion
 - [ ] Tests (jest + testing-library/react-native)
+- [ ] DatePicker nativo para turnos/vitales
+- [ ] Push notifications remotas
