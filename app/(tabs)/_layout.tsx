@@ -136,3 +136,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: COLORS.danger,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+})
+
+    shadowColor: COLORS.danger,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+})
