@@ -22,6 +22,7 @@ import { COLORS } from '@/constants/theme'
 import { Person, Allergy, Medication, EmergencyContact } from '@/types/database'
 import { AddAllergyModal } from '@/components/modals/AddAllergyModal'
 import { AddContactModal } from '@/components/modals/AddContactModal'
+import { exportFichaAsPdf } from '@/lib/exportFicha'
 
 async function fetchPerson(id: string): Promise<Person | null> {
   const { data, error } = await supabase.from('persons').select('*').eq('id', id).single()
@@ -64,6 +65,19 @@ export default function FichaScreen() {
   const queryClient = useQueryClient()
   const [showAllergyModal, setShowAllergyModal] = useState(false)
   const [showContactModal, setShowContactModal] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  const handleExportPdf = async () => {
+    if (!id || !person) return
+    setExporting(true)
+    try {
+      await exportFichaAsPdf(id, person.full_name)
+    } catch (err) {
+      Alert.alert('Error al exportar', err instanceof Error ? err.message : 'Error desconocido')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const personQuery  = useQuery({ queryKey: ['person', id],      queryFn: () => fetchPerson(id!),      enabled: !!id })
   const allergyQuery = useQuery({ queryKey: ['allergies', id],   queryFn: () => fetchAllergies(id!),   enabled: !!id })
@@ -181,6 +195,20 @@ export default function FichaScreen() {
             <Text style={s.quickBtnLabel}>Documentos</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Exportar PDF */}
+        {person && (
+          <TouchableOpacity
+            style={[s.exportBtn, exporting && { opacity: 0.6 }]}
+            onPress={handleExportPdf}
+            disabled={exporting}
+          >
+            {exporting
+              ? <ActivityIndicator color={COLORS.white} size="small" />
+              : <Text style={s.exportBtnText}>Exportar ficha como PDF</Text>
+            }
+          </TouchableOpacity>
+        )}
 
         {/* Alergias */}
         <View style={s.section}>
@@ -306,17 +334,20 @@ const s = StyleSheet.create({
   quickBtnIcon: { fontSize: 22, marginBottom: 4 },
   quickBtnLabel: { fontSize: 11, fontWeight: '600', color: COLORS.gray500, textAlign: 'center' },
 
+  exportBtn: {
+    backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 14,
+    alignItems: 'center', marginBottom: 20,
+  },
+  exportBtnText: { color: COLORS.white, fontSize: 15, fontWeight: '700' },
+
   // Secciones
   section: { backgroundColor: COLORS.white, borderRadius: 14, padding: 16, marginBottom: 16 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
-  addBtn: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
-  addBtnText: { color: COLORS.white, fontSize: 13, fontWeight: '600' },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  addBtn: { backgroundColor: COLORS.primary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  addBtnText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
   empty: { fontSize: 13, color: COLORS.gray400, textAlign: 'center', paddingVertical: 8 },
-  row: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.gray100,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.gray100 },
   rowMain: { fontSize: 15, fontWeight: '500', color: COLORS.text, flex: 1 },
   rowSub: { fontSize: 12, color: COLORS.gray500, marginTop: 2 },
   badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 8 },

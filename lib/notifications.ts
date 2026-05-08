@@ -66,7 +66,7 @@ export async function scheduleAppointmentReminder(params: {
       data: { appointmentId: params.appointmentId },
       sound: true,
     },
-    trigger: { date: trigger },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: trigger },
   })
 
   return id
@@ -79,5 +79,5 @@ export async function cancelAppointmentReminder(notificationId: string): Promise
 
 /** Cancelar todos los recordatorios de turnos */
 export async function cancelAllReminders(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync()
+    await Notifications.cancelAllScheduledNotificationsAsync()
 }
