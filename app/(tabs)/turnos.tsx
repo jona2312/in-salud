@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { COLORS } from '@/constants/theme'
 import { Person, Appointment, AppointmentType, AppointmentStatus } from '@/types/database'
+import { scheduleAppointmentReminder } from '@/lib/notifications'
 
 async function fetchPersons(): Promise<Pick<Person, 'id' | 'full_name'>[]> {
   const { data, error } = await supabase
@@ -94,7 +95,7 @@ export default function TurnosScreen() {
     }
     setSaving(true)
     try {
-      const { error } = await supabase.from('appointments').insert({
+      const { data: inserted, error } = await supabase.from('appointments').insert({
         person_id:   selectedId,
         date:        date.trim(),
         time:        time.trim() || null,
@@ -105,9 +106,17 @@ export default function TurnosScreen() {
         type,
         notes:       notes.trim() || null,
         status:      'pendiente',
-      })
+      }).select().single()
       if (error) throw new Error(error.message)
       await queryClient.invalidateQueries({ queryKey: ['appointments', selectedId] })
+      // Programar recordatorio local
+      scheduleAppointmentReminder({
+        appointmentId: (inserted as any)?.id ?? '',
+        title:  title.trim(),
+        doctor: doctor.trim() || null,
+        date:   date.trim(),
+        time:   time.trim() || null,
+      }).catch(() => { /* silencioso si no hay permisos */ })
       resetForm()
       setShowModal(false)
       Alert.alert('✓ Guardado', 'Turno agendado correctamente.')
@@ -306,6 +315,13 @@ const s = StyleSheet.create({
   inputMulti: { minHeight: 80, paddingTop: 12 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.gray200 },
+  typeChipSel: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  typeChipText: { fontSize: 13, fontWeight: '600', color: COLORS.text },
+  typeChipTextSel: { color: COLORS.white },
+  btnSave: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
+  btnSaveText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
+})
+Color: COLORS.primary },
   typeChipSel: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   typeChipText: { fontSize: 13, fontWeight: '600', color: COLORS.text },
   typeChipTextSel: { color: COLORS.white },

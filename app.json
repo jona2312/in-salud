@@ -16,9 +16,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.insalud.app",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "in-salud usa Face ID para proteger tu información médica",
-        "NSCameraUsageDescription": "in-salud usa la cámara para fotografiar documentos médicos",
-        "NSPhotoLibraryUsageDescription": "in-salud accede a fotos para subir estudios médicos"
+        "NSFaceIDUsageDescription": "in-salud usa Face ID para proteger tu informaci\u00f3n m\u00e9dica",
+        "NSCameraUsageDescription": "in-salud usa la c\u00e1mara para fotografiar documentos m\u00e9dicos",
+        "NSPhotoLibraryUsageDescription": "in-salud accede a fotos para subir estudios m\u00e9dicos",
+        "NSRemindersUsageDescription": "in-salud usa recordatorios para tus turnos m\u00e9dicos"
       }
     },
     "android": {
@@ -32,13 +33,16 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "CAMERA",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
       ]
     },
     "plugins": [
       "expo-router",
       "expo-local-authentication",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "scheme": "insalud",
     "extra": {

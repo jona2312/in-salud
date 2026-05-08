@@ -130,4 +130,7 @@ git config --local --unset core.hooksPath
 - [x] Edge Function `ai-assistant` (OpenAI GPT-4o — DESPLEGADA)
 - [x] Pantalla de documentos (documentos.tsx — PDF + imágenes, Storage buckets avatars y documents CREADOS)
 - [ ] Registro de toma de medicamentos (tabla `medication_logs` lista)
-- [ ] Notificaciones de turnos
+- [ ] Notificaciones de turnos (expo-notifications)
+- [ ] Exportar ficha como PDF
+- [ ] Modo offline con sincronización
+- [ ] Tests (jest + testing-library/react-native)

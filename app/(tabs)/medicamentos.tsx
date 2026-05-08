@@ -179,7 +179,7 @@ export default function MedicamentosScreen() {
                       {m.frequency ? <Text style={styles.medFreq}>{m.frequency}</Text> : null}
                       {(m.time_morning || m.time_afternoon || m.time_evening || m.time_night) ? (
                         <Text style={styles.medSchedule}>
-                          {[m.time_morning && '\u{1F305}', m.time_afternoon && '\u2600\uFE0F', m.time_evening && '\u{1F307}', m.time_night && '\u{1F319}'].filter(Boolean).join(' ')}
+                          {[m.time_morning && 'Man', m.time_afternoon && 'Tar', m.time_evening && 'Noc', m.time_night && 'Med'].filter(Boolean).join(' \u00B7 ')}
                         </Text>
                       ) : null}
                       {m.notes ? <Text style={styles.medNotes}>{m.notes}</Text> : null}
