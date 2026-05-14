@@ -42,9 +42,7 @@
       "expo-router",
       "expo-local-authentication",
       "expo-secure-store",
-      "expo-notifications",
-      "expo-print",
-      "expo-sharing"
+      "expo-notifications"
     ],
     "scheme": "insalud",
     "extra": {
