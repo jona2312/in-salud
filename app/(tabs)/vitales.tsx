@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * app/(tabs)/vitales.tsx — Registro de signos vitales en el tiempo
  * v2: PA, glucemia, peso, SpO2, FC, temperatura
@@ -106,6 +107,7 @@ export default function VitalesScreen() {
     setSaving(true)
     try {
       const { error } = await supabase.from('vitals').insert({
+        owner_id: await requireOwnedPerson(selectedId!),
         person_id:    selectedId,
         bp_systolic:  hasBP ? sys : null,
         bp_diastolic: hasBP ? dia : null,

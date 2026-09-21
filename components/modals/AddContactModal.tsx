@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * components/modals/AddContactModal.tsx
  * SEGURIDAD: person_id siempre del prop
@@ -35,6 +36,7 @@ export function AddContactModal({ visible, personId, onClose, onSaved }: Props) 
     setSaving(true)
     try {
       const { error } = await supabase.from('emergency_contacts').insert({
+        owner_id: await requireOwnedPerson(personId),
         person_id: personId, name: cName.trim(), type,
         phone: phone.trim() || null, specialty: specialty.trim() || null, is_primary: isPrimary,
       })

@@ -95,16 +95,10 @@ export default function HomeScreen() {
               onPress={() => router.push(`/(tabs)/ficha?id=${person.id}`)}
             >
               <View style={styles.personAvatar}>
-                {person.avatar_url ? (
-                  <Image
-                    source={{ uri: person.avatar_url }}
-                    style={styles.personAvatarImage}
-                  />
-                ) : (
+
                   <Text style={styles.personInitial}>
                     {person.full_name.charAt(0).toUpperCase()}
                   </Text>
-                )}
               </View>
               <View style={styles.personInfo}>
                 <Text style={styles.personName}>{person.full_name}</Text>

@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * components/modals/AddAntecedentModal.tsx
  * SEGURIDAD: person_id siempre del prop
@@ -45,6 +46,7 @@ export function AddAntecedentModal({ visible, personId, onClose, onSaved }: Prop
     setSaving(true)
     try {
       const { error } = await supabase.from('antecedents').insert({
+        owner_id: await requireOwnedPerson(personId),
         person_id: personId, type, description: description.trim(),
         year: yearNum, notes: notes.trim() || null,
       })

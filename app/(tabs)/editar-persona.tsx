@@ -1,22 +1,9 @@
-/**
- * app/(tabs)/editar-persona.tsx — Edición de datos de una persona + foto de perfil
- *
- * SEGURIDAD:
- * - Solo el owner puede editar (RLS en Supabase lo garantiza)
- * - La foto se sube a Storage con path: avatars/{user_id}/{person_id}.jpg
- * - No se expone el path completo al cliente, solo se guarda en avatar_url
- * - owner_id nunca se modifica desde el cliente
- *
- * STORAGE: Requiere bucket "avatars" en Supabase con política:
- *   INSERT/UPDATE/SELECT solo para usuarios autenticados cuyo uid == carpeta
- */
-
+/** Edición de persona. Fotos pausadas hasta migrar Storage privado. */
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, ScrollView, StyleSheet, Image,
   TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform
 } from 'react-native'
-import * as ImagePicker from 'expo-image-picker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
@@ -51,9 +38,9 @@ export default function EditarPersonaScreen() {
   // Estado del formulario
   const [isLoading, setIsLoading]         = useState(true)
   const [isSubmitting, setIsSubmitting]   = useState(false)
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
-  const [avatarUrl, setAvatarUrl]         = useState<string | null>(null)
-  const [localPhotoUri, setLocalPhotoUri] = useState<string | null>(null)
+  const isUploadingPhoto = false
+  const avatarUrl: string | null = null
+  const localPhotoUri: string | null = null
 
   const [fullName, setFullName]           = useState('')
   const [birthDate, setBirthDate]         = useState('')
@@ -90,82 +77,13 @@ export default function EditarPersonaScreen() {
       setBpSystolic(p.bp_systolic?.toString() ?? '')
       setBpDiastolic(p.bp_diastolic?.toString() ?? '')
       setNotes(p.notes ?? '')
-      setAvatarUrl(p.avatar_url ?? null)
       setIsLoading(false)
     }
     load()
   }, [personId])
 
-  // Selección de foto
-  const pickPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (!perm.granted) {
-      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para cambiar la foto.')
-      return
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    })
-    if (!result.canceled && result.assets[0]) {
-      setLocalPhotoUri(result.assets[0].uri)
-    }
-  }
-
-  const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync()
-    if (!perm.granted) {
-      Alert.alert('Permiso requerido', 'Necesitamos acceso a la cámara para tomar la foto.')
-      return
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    })
-    if (!result.canceled && result.assets[0]) {
-      setLocalPhotoUri(result.assets[0].uri)
-    }
-  }
-
-  const showPhotoOptions = () => {
-    Alert.alert('Foto de perfil', 'Elegí una opción', [
-      { text: 'Cámara', onPress: takePhoto },
-      { text: 'Galería', onPress: pickPhoto },
-      { text: 'Cancelar', style: 'cancel' },
-    ])
-  }
-
-  // Subir foto a Supabase Storage
-  const uploadPhoto = async (uri: string, userId: string, pId: string): Promise<string | null> => {
-    try {
-      setIsUploadingPhoto(true)
-      const response = await fetch(uri)
-      const blob = await response.blob()
-      const arrayBuffer = await blob.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-
-      const filePath = `${userId}/${pId}.jpg`
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, uint8Array, {
-          contentType: 'image/jpeg',
-          upsert: true,
-        })
-
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath)
-      return data.publicUrl
-    } catch (err) {
-      console.error('Error subiendo foto:', err)
-      return null
-    } finally {
-      setIsUploadingPhoto(false)
-    }
-  }
+  // Paused until the legacy public bucket is migrated and verified private.
+  const showPhotoOptions = () => Alert.alert('Fotos en preparación', 'La carga de fotos está pausada hasta completar la protección de archivos.')
 
   const handleSave = async () => {
     const name = fullName.trim()
@@ -193,17 +111,6 @@ export default function EditarPersonaScreen() {
 
     setIsSubmitting(true)
     try {
-      // Subir foto si hay una nueva
-      let newAvatarUrl = avatarUrl
-      if (localPhotoUri) {
-        const uploaded = await uploadPhoto(localPhotoUri, session.user.id, personId!)
-        if (uploaded) {
-          newAvatarUrl = uploaded
-        } else {
-          Alert.alert('Foto no guardada', 'No se pudo subir la foto, pero el resto de los datos sí se guardará.')
-        }
-      }
-
       const { error } = await supabase.from('persons').update({
         full_name:         name,
         birth_date:        birthDate.trim() || null,
@@ -216,7 +123,7 @@ export default function EditarPersonaScreen() {
         bp_systolic:       sys,
         bp_diastolic:      dia,
         notes:             notes.trim() || null,
-        avatar_url:        newAvatarUrl,
+        // avatar_url preserved; public file migration pending.
       }).eq('id', personId!)
 
       if (error) throw new Error(error.message)

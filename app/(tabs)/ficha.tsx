@@ -102,8 +102,10 @@ export default function FichaScreen() {
     Alert.alert('✓ Guardado', 'Contacto agregado correctamente.')
   }
 
+if ([personQuery, allergyQuery, medsQuery, contactQuery].some(q => q.isError)) return <View style={{ padding: 24 }}><Text>No se pudo cargar la ficha completa. No interpretes información faltante como ausencia de antecedentes.</Text></View>
+
   if (!id) {
-    return (
+  return (
       <View style={s.center}>
         <Text style={s.hint}>Seleccioná una persona desde Inicio</Text>
       </View>
@@ -131,11 +133,9 @@ export default function FichaScreen() {
         {person && (
           <View style={s.header}>
             <View style={s.avatar}>
-              {person.avatar_url ? (
-                <Image source={{ uri: person.avatar_url }} style={s.avatarImage} />
-              ) : (
+
                 <Text style={s.avatarText}>{person.full_name[0]}</Text>
-              )}
+
             </View>
             <View style={s.headerInfo}>
               <Text style={s.name}>{person.full_name}</Text>

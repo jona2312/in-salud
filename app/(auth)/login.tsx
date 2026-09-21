@@ -13,6 +13,7 @@ import {
   StyleSheet, KeyboardAvoidingView, Platform,
   ActivityIndicator, Alert
 } from 'react-native'
+import { Redirect } from 'expo-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { authenticateWithBiometric } from '@/lib/biometric'
 import { COLORS } from '@/constants/theme'
@@ -22,44 +23,33 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [cooldown, setCooldown] = useState(false)
 
-  const { signIn, isLoading, error, clearError, unlockApp, session } = useAuthStore()
+  const { signIn, isLoading, error, clearError, unlockApp, session, isLocked, isInitialized, signOut } = useAuthStore()
 
   // Si ya hay sesión, mostrar pantalla de biometría
   const handleBiometric = useCallback(async () => {
     const result = await authenticateWithBiometric()
     if (result.success) {
       unlockApp()
-    } else if (result.fallbackToPin) {
-      Alert.alert('Usar PIN', 'Ingresá tu PIN de 4 dígitos', [
-        { text: 'Cancelar', style: 'cancel' },
-      ])
+    } else {
+      Alert.alert('Acceso bloqueado', 'Verificá tu contraseña para continuar.')
     }
   }, [unlockApp])
 
   const handleLogin = useCallback(async () => {
     if (cooldown || isLoading) return
     clearError()
-    await signIn(email, password)
+    await signIn(session?.user.email ?? email, password)
+    setPassword('')
 
     // Cooldown visual después de intento fallido
-    if (error) {
+    if (useAuthStore.getState().error) {
       setCooldown(true)
       setTimeout(() => setCooldown(false), 3000)
     }
   }, [email, password, cooldown, isLoading, signIn, clearError, error])
 
-  // Si hay sesión activa, mostrar pantalla de desbloqueo biométrico
-  if (session) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>in-salud</Text>
-        <Text style={styles.subtitle}>Tu familia. Tu salud. Segura.</Text>
-        <TouchableOpacity style={styles.biometricButton} onPress={handleBiometric}>
-          <Text style={styles.biometricText}>🔐 Desbloquear con biometría</Text>
-        </TouchableOpacity>
-      </View>
-    )
-  }
+  if (!isInitialized) return <View style={styles.container}><ActivityIndicator /></View>
+  if (session && !isLocked) return <Redirect href="/(tabs)" />
 
   return (
     <KeyboardAvoidingView
@@ -70,11 +60,17 @@ export default function LoginScreen() {
       <Text style={styles.subtitle}>Tu familia. Tu salud. Segura.</Text>
 
       <View style={styles.form}>
+        {session && <>
+          <Text style={styles.subtitle}>Acceso bloqueado. Verificá tu identidad.</Text>
+          {Platform.OS !== 'web' && <TouchableOpacity style={styles.biometricButton} onPress={handleBiometric} accessibilityRole="button"><Text style={styles.biometricText}>Desbloquear con el dispositivo</Text></TouchableOpacity>}
+          <TouchableOpacity onPress={() => void signOut()} accessibilityRole="button"><Text>Cerrar sesión</Text></TouchableOpacity>
+        </>}
         <TextInput
           style={styles.input}
           placeholder="Email"
           placeholderTextColor={COLORS.gray400}
-          value={email}
+          value={session?.user.email ?? email}
+          editable={!session}
           onChangeText={(v) => { setEmail(v); clearError() }}
           keyboardType="email-address"
           autoCapitalize="none"

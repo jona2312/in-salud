@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * components/modals/AddAllergyModal.tsx
  * SEGURIDAD: person_id siempre del prop
@@ -35,6 +36,7 @@ export function AddAllergyModal({ visible, personId, onClose, onSaved }: Props) 
     setSaving(true)
     try {
       const { error } = await supabase.from('allergies').insert({
+        owner_id: await requireOwnedPerson(personId),
         person_id: personId, name: name.trim(), severity, notes: notes.trim() || null,
       })
       if (error) throw new Error(error.message)

@@ -2,9 +2,9 @@
  * app/(tabs)/emergencia.tsx — Modo SOS
  *
  * SEGURIDAD:
- * - Muestra datos críticos sin requerir re-auth (acceso rápido de emergencia)
+ * - Acceso autenticado; la ficha sin bloqueo y el modo offline siguen pendientes
  * - Solo expone info mínima necesaria: sangre, alergias graves, meds prohibidos/rescate, contactos
- * - QR embebe los datos directamente (no URL remota) — funciona offline
+ * - QR de texto contiene datos copiables; exige confirmación explícita. No es un enlace revocable
  * - No permite edición desde esta pantalla
  */
 
@@ -21,7 +21,7 @@ import { Person, Allergy, Medication, EmergencyContact } from '@/types/database'
 
 async function fetchAllPersons(): Promise<Person[]> {
   const { data, error } = await supabase
-    .from('persons').select('*').order('created_at', { ascending: true })
+    .from('persons').select('*').eq('is_emergency_visible', true).order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
   return data ?? []
 }
@@ -34,6 +34,9 @@ async function fetchCriticalData(personId: string) {
     supabase.from('emergency_contacts').select('*').eq('person_id', personId)
       .eq('is_primary', true).limit(2),
   ])
+  if ([allergiesRes, medsRes, contactsRes].some(result => result.error)) {
+    throw new Error('No se pudo verificar la información. No equivale a ausencia de antecedentes.')
+  }
   return {
     allergies: (allergiesRes.data ?? []) as Allergy[],
     medications: (medsRes.data ?? []) as Medication[],
@@ -101,7 +104,7 @@ export default function EmergenciaScreen() {
 
   const persons = personsQuery.data ?? []
   const selectedPerson = persons.find(p => p.id === selectedPersonId)
-  const criticalData = criticalQuery.data
+  const criticalData = criticalQuery.isError ? undefined : criticalQuery.data
   const qrText = selectedPerson && criticalData
     ? buildQRText(selectedPerson, criticalData)
     : ''
@@ -114,6 +117,10 @@ export default function EmergenciaScreen() {
     })
   }
 
+  if (personsQuery.isError || criticalQuery.isError) return <View style={styles.container}>
+    <Text>No se pudo verificar la ficha. Información no disponible; no significa ausencia de alergias o medicación.</Text>
+    <TouchableOpacity onPress={() => { void personsQuery.refetch(); void criticalQuery.refetch() }}><Text>Reintentar</Text></TouchableOpacity>
+  </View>
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -226,7 +233,7 @@ export default function EmergenciaScreen() {
 
                 {/* Botón QR */}
                 {criticalData && (
-                  <TouchableOpacity style={styles.qrButton} onPress={() => setShowQR(true)}>
+                  <TouchableOpacity style={styles.qrButton} onPress={() => Alert.alert('Compartir datos de salud', 'Este QR contiene información en texto: cualquiera puede copiarla y una copia no puede revocarse. ¿Querés mostrarlo?', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Mostrar QR', onPress: () => setShowQR(true) }])}>
                     <Text style={styles.qrButtonText}>📱 Ver QR de emergencia</Text>
                     <Text style={styles.qrButtonSub}>Escanealo sin necesitar la app</Text>
                   </TouchableOpacity>

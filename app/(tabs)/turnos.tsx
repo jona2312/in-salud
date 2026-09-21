@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * app/(tabs)/turnos.tsx — Agenda de turnos médicos
  * v2: próximas citas, historial, recordatorio
@@ -96,6 +97,7 @@ export default function TurnosScreen() {
     setSaving(true)
     try {
       const { data: inserted, error } = await supabase.from('appointments').insert({
+        owner_id: await requireOwnedPerson(selectedId!),
         person_id:   selectedId,
         date:        date.trim(),
         time:        time.trim() || null,
@@ -315,13 +317,6 @@ const s = StyleSheet.create({
   inputMulti: { minHeight: 80, paddingTop: 12 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: COLORS.gray200 },
-  typeChipSel: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  typeChipText: { fontSize: 13, fontWeight: '600', color: COLORS.text },
-  typeChipTextSel: { color: COLORS.white },
-  btnSave: { backgroundColor: COLORS.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 24 },
-  btnSaveText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
-})
-Color: COLORS.primary },
   typeChipSel: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   typeChipText: { fontSize: 13, fontWeight: '600', color: COLORS.text },
   typeChipTextSel: { color: COLORS.white },

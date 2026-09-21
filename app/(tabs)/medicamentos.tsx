@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * app/(tabs)/medicamentos.tsx — Gestión de medicación
  * Vista por persona con FAB para agregar medicamentos
@@ -53,6 +54,7 @@ async function fetchTodayLogs(personId: string): Promise<MedicationLog[]> {
 async function logMedTake(medicationId: string, personId: string): Promise<void> {
   const now = new Date()
   const { error } = await supabase.from('medication_logs').insert({
+    owner_id: await requireOwnedPerson(personId),
     medication_id: medicationId,
     person_id: personId,
     taken_at: now.toISOString(),

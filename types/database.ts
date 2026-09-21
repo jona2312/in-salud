@@ -191,5 +191,4 @@ export type AuditLog = {
  *   supabase gen types typescript --schema salud > types/supabase.generated.ts
  * Por ahora se usa 'any' para no bloquear el build.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Database = any

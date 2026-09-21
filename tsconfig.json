@@ -6,7 +6,15 @@
     "strictNullChecks": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "supabase/functions",
+    "dist",
+    "preview-dist"
+  ]
 }

@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * components/modals/AddEventModal.tsx
  * SEGURIDAD: person_id siempre del prop
@@ -48,6 +49,7 @@ export function AddEventModal({ visible, personId, onClose, onSaved }: Props) {
     setSaving(true)
     try {
       const { error } = await supabase.from('medical_events').insert({
+        owner_id: await requireOwnedPerson(personId),
         person_id: personId, title: title.trim(), type, date: date.trim(),
         description: description.trim() || null, doctor: doctor.trim() || null,
         institution: institution.trim() || null, notes: notes.trim() || null,

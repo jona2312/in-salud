@@ -2,7 +2,7 @@
  * lib/supabase.ts — Cliente Supabase seguro para in-salud
  *
  * SEGURIDAD:
- * - Usa SecureStore para persistir sesiones (no AsyncStorage)
+ * - Usa SecureStore en móvil; sesión en memoria en web
  * - Solo el anon key en el cliente — service role NUNCA aquí
  * - Schema 'salud' especificado para aislamiento de tablas
  * - RLS se aplica automáticamente para todas las queries
@@ -11,10 +11,12 @@
 import 'react-native-url-polyfill/auto'
 import { createClient } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
+import { Platform } from 'react-native'
+import { IS_PREVIEW } from './preview'
 import { Database } from '@/types/database'
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = IS_PREVIEW ? 'https://preview.invalid' : process.env.EXPO_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = IS_PREVIEW ? 'demo-no-credentials' : process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
@@ -36,15 +38,16 @@ const SecureStoreAdapter = {
 
 export const supabase = createClient<Database, 'salud'>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: SecureStoreAdapter,
-    autoRefreshToken: true,
-    persistSession: true,
+    storage: Platform.OS === 'web' ? undefined : SecureStoreAdapter,
+    autoRefreshToken: !IS_PREVIEW,
+    persistSession: !IS_PREVIEW && Platform.OS !== 'web',
     detectSessionInUrl: false, // Deshabilitado en mobile — usa deep links
   },
   db: {
     schema: 'salud', // Schema dedicado — aislado del schema public de in-mejora
   },
   global: {
+    ...(IS_PREVIEW ? { fetch: (() => Promise.reject(new Error('Demo sin conexión'))) as typeof fetch } : {}),
     headers: {
       'x-app-name': 'in-salud',
     },
