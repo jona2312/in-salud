@@ -27,6 +27,7 @@ Base revalidada: `master` en `a6685c29c25fad2b41c510841135993f9cb0720c`. Rama: `
 | Revisión React | Hooks incondicionales; estados derivados simples; controles de demo con rol/estado; carga protegida en layout |
 | Browser QA | NO EJECUTADO: el servidor supervisado inició, pero la política de URL del navegador bloqueó el acceso; no se intentó eludirla |
 | WebMCP opcional de demo | Registro read-only con feature detection; validación en contexto compatible NO disponible por el mismo bloqueo |
+| Exportación JavaScript/Hermes para Android | PASS con configuración ficticia y modo demo desactivado; 1481 módulos. No compila ni firma un APK |
 | APK/biometría/dispositivo Android | NO EJECUTADO |
 | RLS y Storage con cuentas A/B en backend de ensayo | NO EJECUTADO; bloqueante antes de beta con datos reales |
 | Función Deno | Fuente de contención, sin despliegue ni validación Deno |
@@ -49,3 +50,6 @@ El historial del informe anterior está en `docs/historico`; PRODUCTO y ROADMAP 
 [INsalud · Bitácora de salud](https://insalud-bitacora-demo-jona.jonaromero.chatgpt.site)
 
 Publicación confirmada por el servicio de hosting. Acceso privado del propietario. Es una exportación de `components/DemoPreview.tsx` mediante `scripts/export-preview.cjs`, no la app conectada ni un APK. La comprobación visual por navegador permanece bloqueada; publicación exitosa no equivale a QA de interacción completada.
+
+## Revisión en GitHub
+Cambios publicados en [PR #1](https://github.com/jona2312/in-salud/pull/1), en borrador contra master. Verificaciones locales y exportación Android registradas arriba; consultar la pestaña Checks para el estado actualizado de CI remota.
