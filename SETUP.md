@@ -65,3 +65,5 @@ in-salud-app/
 - [ ] Variables de entorno correctas para el entorno (dev/prod)
 - [ ] RLS activo en Supabase (verificar en Dashboard)
 - [ ] Ninguna key hardcodeada en el código
+
+> **Actualización 21/09/2026:** esta guía es histórica. Consultar README.md y docs/ESTADO.md para el estado vigente. No seguir instrucciones de publicación o políticas de Storage de esta guía sin contrastarlas con docs/ROADMAP.md. La app aún no está aprobada para datos reales.

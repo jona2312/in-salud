@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * components/modals/AddMedModal.tsx
  * Modal para agregar medicamento a una persona
@@ -50,6 +51,7 @@ export function AddMedModal({ visible, personId, personName, onClose, onSaved }:
     setSaving(true)
     try {
       const { error } = await supabase.from('medications').insert({
+        owner_id: await requireOwnedPerson(personId),
         person_id: personId, name: name.trim(), type,
         dose: dose.trim() || null, frequency: frequency.trim() || null,
         time_morning: morning, time_afternoon: afternoon,

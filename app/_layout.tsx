@@ -1,90 +1,34 @@
-/**
- * app/_layout.tsx — Root layout de la app
- *
- * SEGURIDAD:
- * - Escucha cambios de sesión de Supabase
- * - Re-lock automático al volver al foreground después de 5 min
- * - Redirige a login si no hay sesión activa
- */
-
-import { useEffect, useRef } from 'react'
-import { AppState, AppStateStatus } from 'react-native'
-import { Slot, useRouter, useSegments } from 'expo-router'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { AppState } from 'react-native'
+import { Slot } from 'expo-router'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryClient } from '@/lib/queryClient'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { IS_PREVIEW } from '@/lib/preview'
+import DemoPreview from '@/components/DemoPreview'
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      staleTime: 1000 * 60 * 5, // 5 minutos
-    },
-  },
-})
-
-function RootLayoutNav() {
-  const router = useRouter()
-  const segments = useSegments()
-  const { session, isLocked, setSession, lockAppNow, checkBiometricLock } = useAuthStore()
-  const appState = useRef(AppState.currentState)
-  const backgroundTimestamp = useRef<number | null>(null)
-
-  // Escuchar cambios de sesión de Supabase
+function SessionLifecycle() {
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
-
+    let active = true
+    let authEventReceived = false
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+      authEventReceived = true
+      if (active) useAuthStore.getState().setSession(session)
     })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  // Re-lock automático al volver de background
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
-      if (appState.current === 'active' && nextState === 'background') {
-        backgroundTimestamp.current = Date.now()
-      }
-
-      if (nextState === 'active' && backgroundTimestamp.current) {
-        const elapsed = Date.now() - backgroundTimestamp.current
-        const FIVE_MINUTES = 5 * 60 * 1000
-        if (elapsed > FIVE_MINUTES) {
-          await lockAppNow()
-        } else {
-          await checkBiometricLock()
-        }
-        backgroundTimestamp.current = null
-      }
-
-      appState.current = nextState
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (active && !authEventReceived) useAuthStore.getState().setSession(error ? null : data.session)
+    }).catch(() => {
+      if (active && !authEventReceived) useAuthStore.getState().setSession(null)
     })
-
-    return () => subscription.remove()
+    const app = AppState.addEventListener('change', state => {
+      if (state !== 'active') useAuthStore.getState().lockAppNow()
+    })
+    return () => { active = false; subscription.unsubscribe(); app.remove() }
   }, [])
-
-  // Protección de rutas
-  useEffect(() => {
-    const inAuthGroup = segments[0] === '(auth)'
-
-    if (!session && !inAuthGroup) {
-      router.replace('/(auth)/login')
-    } else if (session && inAuthGroup) {
-      router.replace('/(tabs)')
-    }
-  }, [session, segments])
-
   return <Slot />
 }
-
 export default function RootLayout() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <RootLayoutNav />
-    </QueryClientProvider>
-  )
+  if (IS_PREVIEW) return <DemoPreview />
+  return <QueryClientProvider client={queryClient}><SessionLifecycle /></QueryClientProvider>
 }

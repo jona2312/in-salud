@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * app/(tabs)/documentos.tsx — Documentos y estudios médicos
  *
@@ -9,7 +10,7 @@
  * - Bucket 'documents' es privado (no public)
  * - RLS: solo el owner puede acceder a sus carpetas
  * - URLs firmadas con expiración de 1 hora para visualización
- * - owner_id siempre tomado del servidor via RLS, nunca del cliente
+ * - owner_id proviene de identidad verificada; RLS valida, no completa campos
  */
 
 import { useState } from 'react'
@@ -103,6 +104,7 @@ export default function DocumentosScreen() {
 
     setUploading(true)
     try {
+      const ownerId = await requireOwnedPerson(personId)
       const ext = fileName.split('.').pop() ?? 'bin'
       const uuid = `${Date.now()}-${Math.random().toString(36).slice(2)}`
       const storagePath = `${session.user.id}/${personId}/${uuid}.${ext}`
@@ -126,7 +128,8 @@ export default function DocumentosScreen() {
       const { error: dbError } = await supabase
         .from('documents')
         .insert({
-          person_id: personId,
+        owner_id: ownerId,
+        person_id: personId,
           name: fileName,
           file_url: storagePath,
           file_type: fileType,

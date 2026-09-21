@@ -1,113 +1,64 @@
-/**
- * stores/useAuthStore.ts — Estado global de autenticación
- *
- * SEGURIDAD:
- * - La sesión de Supabase se persiste en SecureStore (ver lib/supabase.ts)
- * - El estado biométrico es SOLO local — no se envía a Supabase
- * - isLocked controla el acceso a la app después del re-lock por inactividad
- */
-
 import { create } from 'zustand'
 import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { lockApp, isAuthStillValid } from '@/lib/biometric'
+import { clearPrivateCache } from '@/lib/queryClient'
+import { cancelAllReminders } from '@/lib/notifications'
 
 interface AuthState {
   session: Session | null
   user: User | null
-  isLocked: boolean       // App bloqueada por biometría (no por sesión)
+  isLocked: boolean
+  isInitialized: boolean
   isLoading: boolean
   error: string | null
-
-  // Actions
   setSession: (session: Session | null) => void
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   unlockApp: () => void
-  lockAppNow: () => Promise<void>
-  checkBiometricLock: () => Promise<void>
+  lockAppNow: () => void
   clearError: () => void
 }
-
+let authOperation = 0
 export const useAuthStore = create<AuthState>((set, get) => ({
-  session: null,
-  user: null,
-  isLocked: true,
-  isLoading: false,
-  error: null,
-
+  session: null, user: null, isLocked: true, isInitialized: false, isLoading: false, error: null,
   setSession: (session) => {
-    set({
-      session,
-      user: session?.user ?? null,
-      // Si hay sesión, bloquear app hasta que pase biometría
-      isLocked: session !== null,
-    })
+    const changed = get().user?.id !== session?.user.id
+    if (changed || !session) clearPrivateCache()
+    set({ session, user: session?.user ?? null, isInitialized: true,
+      isLocked: changed || !session ? true : get().isLocked })
   },
-
-  signIn: async (email: string, password: string) => {
-    // Validación básica antes de llamar a Supabase
-    if (!email || !password) {
-      set({ error: 'Email y contraseña requeridos' })
-      return
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      set({ error: 'Email inválido' })
-      return
-    }
-    if (password.length < 6) {
-      set({ error: 'Contraseña demasiado corta' })
-      return
-    }
-
+  signIn: async (email, password) => {
+    if (!email.trim() || !password) { set({ error: 'Email y contraseña requeridos' }); return }
+    const operation = ++authOperation
+    const expectedUser = get().user?.id
     set({ isLoading: true, error: null })
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
-        password,
-      })
-
-      if (error) {
-        // No exponer mensajes internos de Supabase al usuario
-        set({ error: 'Credenciales incorrectas. Intentá de nuevo.', isLoading: false })
-        return
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
+      if (operation !== authOperation) return
+      if (error || !data.session || (expectedUser && data.user?.id !== expectedUser)) {
+        set({ error: 'No se pudo verificar la identidad.', isLocked: true }); return
       }
-
-      set({
-        session: data.session,
-        user: data.user,
-        isLocked: true, // Siempre bloquear después de login — requiere biometría
-        isLoading: false,
-        error: null,
-      })
-    } catch {
-      set({ error: 'Error de conexión. Verificá tu internet.', isLoading: false })
-    }
+      // A fresh password verification is itself the fallback, not a local PIN.
+      get().setSession(data.session)
+      set({ isLocked: false })
+    } catch { if (operation === authOperation) set({ error: 'No se pudo conectar. Intentá nuevamente.', isLocked: true }) }
+    finally { if (operation === authOperation) set({ isLoading: false }) }
   },
-
   signOut: async () => {
-    await lockApp()
-    await supabase.auth.signOut()
-    set({ session: null, user: null, isLocked: true, error: null })
-  },
-
-  unlockApp: () => {
-    set({ isLocked: false })
-  },
-
-  lockAppNow: async () => {
-    await lockApp()
-    set({ isLocked: true })
-  },
-
-  checkBiometricLock: async () => {
-    const { session } = get()
-    if (!session) return
-    const valid = await isAuthStillValid()
-    if (!valid) {
-      set({ isLocked: true })
+    ++authOperation
+    // Block/unmount private views before asynchronous cleanup, even when offline.
+    set({ isLocked: true, error: null, isLoading: false })
+    clearPrivateCache()
+    try {
+      await cancelAllReminders()
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
+      if (error) throw error
+      get().setSession(null)
+    } catch {
+      set({ error: 'No se pudo completar el cierre. La app sigue bloqueada; reintentá con conexión.' })
     }
   },
-
+  unlockApp: () => { if (get().session) set({ isLocked: false }) },
+  lockAppNow: () => set({ isLocked: true }),
   clearError: () => set({ error: null }),
 }))

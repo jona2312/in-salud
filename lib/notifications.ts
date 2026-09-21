@@ -55,14 +55,10 @@ export async function scheduleAppointmentReminder(params: {
     return null // El turno ya pasó o es demasiado próximo
   }
 
-  const body = params.doctor
-    ? `Turno con ${params.doctor}`
-    : 'Recordatorio de turno médico'
-
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: params.title,
-      body,
+      title: 'INsalud',
+      body: 'Tenés un recordatorio. Abrí la app para ver el detalle.',
       data: { appointmentId: params.appointmentId },
       sound: true,
     },
@@ -79,5 +75,5 @@ export async function cancelAppointmentReminder(notificationId: string): Promise
 
 /** Cancelar todos los recordatorios de turnos */
 export async function cancelAllReminders(): Promise<void> {
-    await Notifications.cancelAllScheduledNotificationsAsync()
+  if (Platform.OS !== 'web') await Notifications.cancelAllScheduledNotificationsAsync()
 }

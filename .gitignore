@@ -34,3 +34,6 @@ npm-debug.log*
 
 # Supabase (nunca commitear service role keys)
 supabase/.temp/
+
+# Isolated preview exports
+preview-dist/

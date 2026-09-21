@@ -1,3 +1,4 @@
+import { requireOwnedPerson } from '@/lib/ownedWrite'
 /**
  * components/modals/AddVaccineModal.tsx
  * SEGURIDAD: person_id siempre del prop
@@ -42,6 +43,7 @@ export function AddVaccineModal({ visible, personId, onClose, onSaved }: Props) 
     setSaving(true)
     try {
       const { error } = await supabase.from('vaccines').insert({
+        owner_id: await requireOwnedPerson(personId),
         person_id: personId, name: name.trim(), status,
         date_applied: dateApplied.trim() || null, next_dose: nextDose.trim() || null,
         notes: notes.trim() || null,

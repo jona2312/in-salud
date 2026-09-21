@@ -17,11 +17,15 @@
  *   - documentos      → desde Ficha
  */
 
-import { Tabs } from 'expo-router'
+import { Tabs, Redirect } from 'expo-router'
 import { StyleSheet, View, Text } from 'react-native'
+import { useAuthStore } from '@/stores/useAuthStore'
 import { COLORS } from '@/constants/theme'
 
 export default function TabsLayout() {
+  const { session, isLocked, isInitialized } = useAuthStore()
+  if (!isInitialized) return <View><Text>Verificando acceso…</Text></View>
+  if (!session || isLocked) return <Redirect href="/(auth)/login" />
   return (
     <Tabs
       screenOptions={{
@@ -136,14 +140,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: COLORS.danger,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-})
-
     shadowColor: COLORS.danger,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,

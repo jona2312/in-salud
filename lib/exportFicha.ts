@@ -27,11 +27,11 @@ async function fetchAll(personId: string): Promise<FichaData> {
     supabase.from('allergies').select('*').eq('person_id', personId).order('severity'),
     supabase.from('medications').select('*').eq('person_id', personId).eq('is_active', true).order('type'),
     supabase.from('emergency_contacts').select('*').eq('person_id', personId).order('is_primary', { ascending: false }),
-    supabase.from('antecedents').select('*').eq('person_id', personId).order('date', { ascending: false }),
-    supabase.from('vaccines').select('*').eq('person_id', personId).order('date', { ascending: false }),
+    supabase.from('antecedents').select('*').eq('person_id', personId).order('year', { ascending: false }),
+    supabase.from('vaccines').select('*').eq('person_id', personId).order('date_applied', { ascending: false }),
     supabase.from('medical_events').select('*').eq('person_id', personId).order('date', { ascending: false }),
   ])
-  if (pR.error) throw new Error(pR.error.message)
+  if ([pR, aR, mR, cR, antR, vR, eR].some(result => result.error)) throw new Error('No se pudo generar una ficha completa. Reintentá con conexión.')
   return {
     person:      pR.data as Person,
     allergies:   (aR.data ?? []) as Allergy[],
